@@ -33,8 +33,8 @@ This repository contains a highly customizable, **consciousness-first, dual-pass
 
 1. **Clone the repository:**
    ```bash
-  git clone https://github.com/atahaniskl/GlobalRoot.git
-  cd GlobalRoot
+   git clone https://github.com/atahaniskl/GlobalRoot.git
+   cd GlobalRoot
    ```
 
 2. **Setup virtual environment:**
@@ -45,10 +45,10 @@ This repository contains a highly customizable, **consciousness-first, dual-pass
    ```
 
 3. **Create your environment file (recommended fallback):**
-  ```bash
-  cp .env.example .env
-  ```
-  You can edit `.env` manually if interactive setup is interrupted.
+   ```bash
+   cp .env.example .env
+   ```
+   You can edit `.env` manually if interactive setup is interrupted.
 
 4. **Run the Interactive Setup Installer:**
    ```bash
