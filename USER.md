@@ -18,16 +18,19 @@ The creator and user of Root. Prefers efficient, direct interactions.
 ## SYSTEM SETUP
 
 Linux setup (or Windows — updated by install.py based on platform selection).
+Typical Linux profile uses Hyprland-style workspace workflows.
 
 ## PREFERENCES
 
 - Efficiency and directness.
+- Automation-first workflows.
 - Concise answers over lengthy explanations.
 - Real results, not assumptions.
 
 ## DISLIKES
 
 - Errors and repeated mistakes.
+- Repetitive manual correction loops.
 - Unnecessary verbosity.
 - Being asked the same clarifying question twice.
 
