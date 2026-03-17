@@ -20,6 +20,9 @@ from tools.app_launcher import (
 )
 from tools.tavily_tools import web_research, read_page
 
+from tools.tavily_tools import web_research, read_page
+from core.audio_handler import speak, listen
+
 from config import BASE_MAX_LOOPS, EXTENDED_MAX_LOOPS, ASSISTANT_NAME, USER_NAME
 from prompts import SYSTEM_GREETING
 
@@ -208,8 +211,19 @@ def main():
     history = []
 
     while True:
+
+        # Either read from mic or input()
+        use_mic = False
         try:
-            user = input(f"{USER_NAME}: ").strip()
+            raw_input = input(f"{USER_NAME} (Type text, or type 'mic' to use microphone): ").strip()
+            if raw_input.lower() == 'mic':
+                use_mic = True
+                user = listen()
+                if not user:
+                    print("Could not hear you. Please type or try again.")
+                    continue
+            else:
+                user = raw_input
         except (KeyboardInterrupt, EOFError):
             print("\nGoodbye.")
             break
@@ -248,6 +262,8 @@ def main():
                 if saved:
                     print("[Saved to memory]")
                 print()
+                if use_mic:
+                    speak(consciousness)
                 break
 
             entity_context = tracker.get_context()
@@ -287,6 +303,8 @@ def main():
                 if saved:
                     print("[Saved to memory]")
                 print()
+                if use_mic:
+                    speak(consciousness)
                 break
 
 
