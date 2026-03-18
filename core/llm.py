@@ -41,7 +41,7 @@ def consciousness_call(messages: list, system: str | None = None) -> str:
         "model": SMART_MODEL,
         "messages": full_messages,
         "stream": True,
-        "think": True,
+        "think": False,
         "options": {
             "temperature": CONSCIOUSNESS_TEMP,
             "top_p": 0.95,
@@ -178,7 +178,7 @@ def consciousness_call_sync(messages: list, system: str | None = None) -> str:
             "model": SMART_MODEL,
             "messages": full_messages,
             "stream": False,
-            "think": True,
+            "think": False,
             "options": {
                 "temperature": CONSCIOUSNESS_TEMP,
                 "top_p": 0.95,

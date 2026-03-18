@@ -3,3 +3,8 @@ chromadb
 python-dotenv
 pyTelegramBotAPI
 tavily-python
+edge-tts
+langdetect
+pygame
+SpeechRecognition
+pyaudio

@@ -35,7 +35,7 @@ def _should_save(user_input: str, assistant_response: str) -> bool:
                 {"role": "user", "content": prompt},
             ],
             "stream": True,
-            "think": True,
+            "think": False,
             "options": {
                 "temperature": 0.1,
                 "repeat_penalty": 1.1,
