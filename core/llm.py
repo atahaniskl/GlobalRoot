@@ -178,7 +178,7 @@ def consciousness_call_sync(messages: list, system: str | None = None) -> str:
             "model": SMART_MODEL,
             "messages": full_messages,
             "stream": False,
-            "think": False,
+            "think": True,
             "options": {
                 "temperature": CONSCIOUSNESS_TEMP,
                 "top_p": 0.95,
@@ -227,7 +227,7 @@ def executor_call(
             "model": SMART_MODEL,
             "messages": messages,
             "stream": False,
-            "think": False,
+            "think": True,
             "format": "json",
             "options": {
                 "temperature": EXECUTOR_TEMP,
