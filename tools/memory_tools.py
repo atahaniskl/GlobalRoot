@@ -4,7 +4,7 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).parent.parent
 
-ALLOWED_FILES = {"SOUL.md", "USER.md", "SKILL.md"}
+ALLOWED_FILES = {"SOUL.md", "USER.md", "SKILL.md", "WISDOM.md"}
 
 def _normalize_content(text: str) -> str:
     """Converts literal backslash-n sequences to real newlines."""
@@ -13,11 +13,27 @@ def _normalize_content(text: str) -> str:
 def _get_filepath(filename: str) -> Path:
     clean_name = Path(filename).name
     if clean_name not in ALLOWED_FILES:
-        raise PermissionError(f"SECURITY VIOLATION: Only SOUL.md, USER.md, and SKILL.md memory files can be managed.")
+        raise PermissionError(f"SECURITY VIOLATION: '{clean_name}' is not allowed. Only SOUL.md, USER.md, SKILL.md, and WISDOM.md memory files can be managed.")
 
-    p = BASE_DIR / clean_name
+    from config import OBSIDIAN_VAULT_DIR, VAULT_DIR_MEMORY
+    vault_path = Path(OBSIDIAN_VAULT_DIR).expanduser().resolve()
+    
+    # V2 path (snake_case), fallback to legacy
+    memory_dir = vault_path / VAULT_DIR_MEMORY
+    if not memory_dir.exists():
+        legacy = vault_path / "_Memory"
+        if legacy.exists():
+            memory_dir = legacy
+        else:
+            memory_dir.mkdir(parents=True, exist_ok=True)
+    
+    p = memory_dir / clean_name
+    
     if not p.exists():
-        raise FileNotFoundError(f"'{clean_name}' not found!")
+        fallback_p = BASE_DIR / clean_name
+        if fallback_p.exists():
+            return fallback_p
+        raise FileNotFoundError(f"'{clean_name}' not found in Obsidian Memory or base directory!")
     return p
 
 

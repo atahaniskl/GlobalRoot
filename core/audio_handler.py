@@ -12,8 +12,17 @@ import tempfile
 
 class AudioHandler:
     def __init__(self):
-        # Initialize pygame mixer for audio playback
-        pygame.mixer.init()
+        # Gracefully handle missing Pygame SDL2 Mixer dependencies
+        self.has_audio = False
+        try:
+            import pygame
+            pygame.mixer.init()
+            self.has_audio = True
+        except Exception as e:
+            # We don't print a fatal error here, just a gentle warning. 
+            # The agent will continue to work perfectly in text-mode.
+            print(f"[AUDIO WARN] Audio playback disabled (Missing Pygame Mixer): {e}")
+
         self.recognizer = sr.Recognizer()
 
     def speak(self, text: str):
@@ -45,15 +54,18 @@ class AudioHandler:
             temp_file = os.path.join(tempfile.gettempdir(), "agent_response.mp3")
             asyncio.run(self._generate_audio(clean_text, voice, temp_file))
             
-            # Play the audio file
-            pygame.mixer.music.load(temp_file)
-            pygame.mixer.music.play()
-            
-            # Wait for audio to finish
-            while pygame.mixer.music.get_busy():
-                pygame.time.Clock().tick(10)
+            if self.has_audio:
+                import pygame
+                # Play the audio file
+                pygame.mixer.music.load(temp_file)
+                pygame.mixer.music.play()
                 
-            pygame.mixer.music.unload()
+                # Wait for audio to finish
+                while pygame.mixer.music.get_busy():
+                    pygame.time.Clock().tick(10)
+                    
+                pygame.mixer.music.unload()
+                
             try:
                 os.remove(temp_file)
             except Exception:

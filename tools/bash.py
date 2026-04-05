@@ -67,38 +67,56 @@ def validate_command(command: str) -> tuple[bool, str]:
 def bash(command: str) -> str:
     """
     Run a secure bash command.
-    - Banned commands are blocked
-    - Dangerous patterns are blocked
-    - Path sandbox check is enforced
-    - Output limited to BASH_MAX_OUTPUT characters
+    - Banned/Dangerous blocked
+    - Starts the process; waits for BASH_TIMEOUT (10-15s).
+    - If it doesn't finish, leaves it running in the background and returns output so far.
+    - Long outputs are middle-truncated (First 50 lines... Last 50 lines) to save LLM tokens.
     """
     valid, msg = validate_command(command)
     if not valid:
         return msg
 
     try:
-        result = subprocess.run(
+        # Start command asynchronously
+        process = subprocess.Popen(
             command,
             shell=True,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
-            timeout=BASH_TIMEOUT,
             cwd=str(Path.home()),
+            start_new_session=True # Detach so it survives Python execution
         )
 
-        output = result.stdout if result.stdout else result.stderr
+        try:
+            # Wait for it to finish within timeout
+            stdout, _ = process.communicate(timeout=BASH_TIMEOUT)
+            is_background = False
+        except subprocess.TimeoutExpired:
+            # If it times out, DO NOT KILL IT. Leave it running in the background!
+            is_background = True
+            stdout = f"\n[The command did not finish within {BASH_TIMEOUT}s. It has been moved to the BACKGROUND and is still executing (PID: {process.pid}).]\n"
 
-        if len(output) > BASH_MAX_OUTPUT:
-            from core.llm import summarize_output
-            output = summarize_output(output)
-
-        if result.returncode == 0:
-            return f"✅ Command successful:\n{output}"
+        # Output Pagination (Middle Truncation)
+        lines = stdout.splitlines()
+        if len(lines) > 120:
+            top_lines = lines[:50]
+            bottom_lines = lines[-50:]
+            skipped_count = len(lines) - 100
+            
+            truncated_stdout = "\n".join(top_lines)
+            truncated_stdout += f"\n\n... [ {skipped_count} lines skipped because output was too long. Showing top 50 and bottom 50 lines ] ...\n\n"
+            truncated_stdout += "\n".join(bottom_lines)
         else:
-            return f"⚠️ Command returned error (exit code: {result.returncode}):\n{output}"
+            truncated_stdout = stdout
 
-    except subprocess.TimeoutExpired:
-        return f"❌ TIMEOUT: Command {BASH_TIMEOUT} seconds! (TIMEOUT)"
+        if is_background:
+            return f"⏳ Background Process Info:\n{truncated_stdout}"
+        
+        if process.returncode == 0:
+            return f"✅ Command successful:\n{truncated_stdout}"
+        else:
+            return f"⚠️ Command returned error (exit code: {process.returncode}):\n{truncated_stdout}"
 
     except Exception as e:
         return f"❌ ERROR: {type(e).__name__}: {str(e)}"

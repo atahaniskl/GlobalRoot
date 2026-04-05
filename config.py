@@ -70,7 +70,10 @@ DANGEROUS_PATTERNS = [">/dev/", "> /dev/", "| dd ", "| mkfs", "| sudo", "|sudo"]
 BASH_TIMEOUT = 30             
 BASH_MAX_OUTPUT = 2000        
 
-CHROMA_PERSIST_DIR = str(Path.home() / ".local/share/jarvis/chroma")
+# Obsidian + RAG settings
+OBSIDIAN_VAULT_DIR = os.environ.get("OBSIDIAN_VAULT_DIR", str(Path.home() / "Obsidian"))
+
+CHROMA_PERSIST_DIR = str(Path(OBSIDIAN_VAULT_DIR).expanduser().resolve() / ".root_index")
 CHROMA_COLLECTION = "root_memory"
 MEMORY_TOP_K = 3
 
@@ -80,9 +83,6 @@ OWNER_CHAT_ID = int(os.environ.get("OWNER_CHAT_ID", "0"))
 TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY", "")
 TAVILY_BASE_URL = os.environ.get("TAVILY_BASE_URL", "https://api.tavily.com")
 TAVILY_TIMEOUT = int(os.environ.get("TAVILY_TIMEOUT", "20"))
-
-# Obsidian + RAG settings
-OBSIDIAN_VAULT_DIR = os.environ.get("OBSIDIAN_VAULT_DIR", str(Path.home() / "Obsidian"))
 OBSIDIAN_EMBED_MODEL = os.environ.get("OBSIDIAN_EMBED_MODEL", "nomic-embed-text")
 OBSIDIAN_RAG_COLLECTION = os.environ.get("OBSIDIAN_RAG_COLLECTION", "obsidian_notes")
 OBSIDIAN_RAG_TOP_K = int(os.environ.get("OBSIDIAN_RAG_TOP_K", "4"))
@@ -90,3 +90,16 @@ OBSIDIAN_RAG_MAX_CONTEXT_CHARS = int(os.environ.get("OBSIDIAN_RAG_MAX_CONTEXT_CH
 OBSIDIAN_CHUNK_SIZE = int(os.environ.get("OBSIDIAN_CHUNK_SIZE", "900"))
 OBSIDIAN_CHUNK_OVERLAP = int(os.environ.get("OBSIDIAN_CHUNK_OVERLAP", "120"))
 OBSIDIAN_CORRECTIONS_DIR = os.environ.get("OBSIDIAN_CORRECTIONS_DIR", "correction_logs")
+
+# ── V2 Neural Architecture: Directory Standards (snake_case) ──────────────
+VAULT_DIR_MEMORY = "_memory"
+VAULT_DIR_JOURNALS = "journals"
+VAULT_DIR_NEURAL_GRAPH = "neural_graph"
+VAULT_DIR_PROJECTS = "projects"
+VAULT_DIR_ATOMIC_NOTES = "03_atomic_notes"
+VAULT_DIR_MOCS = "04_mocs"
+
+# ── Memory Decay Settings ─────────────────────────────────────────────────
+MEMORY_DECAY_DAYS = int(os.environ.get("MEMORY_DECAY_DAYS", "60"))
+MEMORY_DECAY_DEFAULT_PRIORITY = "active"
+MEMORY_DECAY_ARCHIVED_PRIORITY = "archived"

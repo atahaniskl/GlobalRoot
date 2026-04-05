@@ -381,7 +381,8 @@ def read_note(filename: str) -> str:
 
 
 def append_to_note(filename: str, content: str) -> str:
-    """Tool action: append content to an existing note (or create it)."""
+    """Tool action: append content to an existing note (or create it).
+    V2: Auto-touches last_accessed in YAML frontmatter."""
     vault = _vault_path()
     vault.mkdir(parents=True, exist_ok=True)
 
@@ -400,15 +401,25 @@ def append_to_note(filename: str, content: str) -> str:
         return "❌ Target path is not a file."
 
     note_path.parent.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    today = datetime.now().strftime("%Y-%m-%d")
     block = content.strip() or "(empty)"
 
     if note_path.exists():
-        with note_path.open("a", encoding="utf-8") as f:
-            f.write(f"\n\n---\n\n- appended_at: {ts}\n\n{block}\n")
+        # Touch last_accessed in frontmatter
+        text = note_path.read_text(encoding="utf-8")
+        fm, body, has_fm = _split_frontmatter(text)
+        if has_fm:
+            mapping = _parse_frontmatter_map(fm)
+            mapping["last_accessed"] = today
+            new_fm = _render_frontmatter_map(mapping)
+            text = f"---\n{new_fm}\n---\n{body}"
+        
+        text += f"\n\n{block}\n"
+        note_path.write_text(text, encoding="utf-8")
     else:
         stem = Path(safe_name).stem
-        note_path.write_text(f"# {stem}\n\n- created_at: {ts}\n\n{block}\n", encoding="utf-8")
+        payload = f"""---\npriority: high\nlast_accessed: {today}\n---\n# {stem}\n\n{block}\n"""
+        note_path.write_text(payload, encoding="utf-8")
 
     sync_obsidian_index()
     return f"✅ Note appended: {note_path.relative_to(vault)}"
@@ -614,7 +625,8 @@ def open_in_obsidian(filename: str) -> str:
 
 
 def write_to_obsidian(title: str, content: str, folder: str = OBSIDIAN_CORRECTIONS_DIR) -> str:
-    """Tool action: create/update a note in the Obsidian vault."""
+    """Tool action: create/update a note in the Obsidian vault.
+    V2: Auto-injects YAML frontmatter with priority and last_accessed."""
     vault = _vault_path()
     vault.mkdir(parents=True, exist_ok=True)
 
@@ -636,12 +648,11 @@ def write_to_obsidian(title: str, content: str, folder: str = OBSIDIAN_CORRECTIO
     if not _is_within(vault, note_path):
         return "❌ SECURITY: Attempted write outside vault."
 
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    body = content.strip()
-    if not body:
-        body = "(empty)"
+    today = datetime.now().strftime("%Y-%m-%d")
+    body = content.strip() or "(empty)"
 
-    payload = f"# {Path(safe_title).stem}\n\n- updated_at: {timestamp}\n\n{body}\n"
+    # V2: YAML frontmatter injection
+    payload = f"""---\npriority: high\nlast_accessed: {today}\n---\n# {Path(safe_title).stem}\n\n{body}\n"""
 
     note_path.write_text(payload, encoding="utf-8")
     sync_obsidian_index()

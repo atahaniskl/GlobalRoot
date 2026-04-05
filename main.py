@@ -8,11 +8,12 @@ import sys
 import re
 from pathlib import Path
 
-from core.llm import consciousness_call, action_intent_call, executor_call, is_alive
+from core.llm import consciousness_call, is_alive
 from core.memory import Memory, EntityTracker, trim_history
+from core.auto_dream import perform_startup_dreaming
 from tools.bash import bash
-from tools.read_file_tool import read_file
-from tools.write_file_tool import write_file
+from tools.read_file_tool import read_file, list_code_outline
+from tools.write_file_tool import write_file, edit_file
 from tools.memory_tools import append_to_memory, update_section, read_section, edit_line, delete_line
 from tools.app_launcher import (
     open_app, open_app_workspace, youtube_search_play, switch_workspace,
@@ -49,17 +50,40 @@ from prompts import SYSTEM_GREETING
 
 
 def load_system() -> str:
-    """Loads SOUL.md + USER.md as the system prompt."""
+    """Loads SOUL.md + USER.md + WISDOM.md + Neural Graph as the system prompt."""
+    from config import OBSIDIAN_VAULT_DIR, VAULT_DIR_MEMORY, VAULT_DIR_NEURAL_GRAPH
+    vault_path = Path(OBSIDIAN_VAULT_DIR).expanduser().resolve()
+    
+    # V2 path with legacy fallback
+    memory_dir = vault_path / VAULT_DIR_MEMORY
+    if not memory_dir.exists():
+        legacy = vault_path / "_Memory"
+        if legacy.exists():
+            memory_dir = legacy
+    
     base_dir = Path(__file__).parent
     parts = []
 
-    for fname in ["SOUL.md", "SKILL.md", "USER.md"]:
-        p = base_dir / fname
+    for fname in ["SOUL.md", "SKILL.md", "USER.md", "WISDOM.md", "OBSIDIAN_RULES.md"]:
+        p = memory_dir / fname
+        if not p.exists():
+            p_fallback = base_dir / fname
+            if p_fallback.exists():
+                p = p_fallback
+                
         if p.exists():
             parts.append(p.read_text(encoding="utf-8"))
             print(f"[SYSTEM] {fname} loaded successfully! (Length: {len(parts[-1])} characters)")
         else:
-            print(f"[WARNING] {fname} not found! Searched at: {p}")
+            if fname != "OBSIDIAN_RULES.md":
+                print(f"[WARNING] {fname} not found! Searched at: {p}")
+
+    # V2: Load Neural Graph Summary (if available)
+    graph_summary = vault_path / VAULT_DIR_NEURAL_GRAPH / "summary.md"
+    if graph_summary.exists():
+        graph_text = graph_summary.read_text(encoding="utf-8")
+        parts.append(f"<neural_graph_summary>\n{graph_text}\n</neural_graph_summary>")
+        print(f"[SYSTEM] Neural Graph loaded! ({graph_summary.stat().st_size} bytes)")
 
     return "\n\n---\n\n".join(parts)
 
@@ -101,14 +125,28 @@ def execute_tool(action: dict) -> str:
 
         elif action_name == "read_file":
             file = action.get("file", "")
-            print(f"  └─> File: {file}")
-            return read_file(file)
+            start = int(action.get("start_line", 1))
+            end = int(action.get("end_line", 200))
+            print(f"  └─> File: {file} (Lines {start}-{end})")
+            return read_file(file, start, end)
+
+        elif action_name == "list_code_outline":
+            file = action.get("file", "")
+            print(f"  └─> AST Outline: {file}")
+            return list_code_outline(file)
 
         elif action_name == "write_file":
             file = action.get("file", "")
             content = action.get("content", "")
             print(f"  └─> File: {file}")
             return write_file(file, content)
+
+        elif action_name == "edit_file":
+            file = action.get("file", "")
+            old_str = action.get("old_string", "")
+            new_str = action.get("new_string", "")
+            print(f"  └─> Edit File: {file} (Patching substring)")
+            return edit_file(file, old_str, new_str)
 
         elif action_name == "memory_append":
             file = action.get("file", "")
@@ -288,18 +326,21 @@ def main():
     print(f"{SYSTEM_GREETING}")
     print('   Type "exit" to quit\n')
 
+    # Run auto_dream startup hook
+    perform_startup_dreaming()
+
     memory = Memory()
     tracker = EntityTracker()
     history = []
     last_failure: ReflectionFailure | None = None
 
     while True:
-
         # Either read from mic or input()
         use_mic = False
         try:
-            raw_input = input(f"{USER_NAME} (Type text, or type 'mic' to use microphone): ").strip()
-            if raw_input.lower() == 'mic':
+            print()
+            raw_input = input(f"╭─ {USER_NAME}\n╰─❯ ").strip()
+            if raw_input.lower() in ('/mic', 'mic'):
                 use_mic = True
                 user = listen()
                 if not user:
@@ -356,28 +397,7 @@ def main():
             step_label = f"{'='*20} [Loop {loop+1}/{max_loops}] {'='*20}"
             print(f"\n{step_label}")
 
-            consciousness = consciousness_call(history, system=system)
-
-            has_action_intent = action_intent_call(user, consciousness)
-
-            if not has_action_intent:
-                print(f"\n[Executor] Action: none (no action intent detected)")
-                history.append({"role": "assistant", "content": consciousness})
-                saved = memory.save(user, consciousness)
-                if saved:
-                    print("[Saved to memory]")
-                print()
-                if use_mic:
-                    speak(consciousness)
-                break
-
-            entity_context = tracker.get_context()
-            actions = executor_call(
-                user,
-                consciousness,
-                entity_context,
-                allow_regex_fallback=(loop == 0),
-            )
+            consciousness, actions = consciousness_call(history, system=system)
 
             requested_workspace = _extract_requested_workspace(user)
             if requested_workspace:
@@ -410,6 +430,7 @@ def main():
                 print()
                 if use_mic:
                     speak(consciousness)
+                
                 break
 
 
@@ -434,9 +455,14 @@ def main():
                 _WEB_TOOLS = {"web_research", "read_page", "deep_research", "crawl_page"}
                 action_key = str(sorted(action_dict.items()))
                 type_key = f"__type__{action_name}"
+                
+                # State History Enforcement (Infinite Loop Protection)
                 if action_key in executed_actions or (action_name in _WEB_TOOLS and type_key in executed_actions):
-                    print(f"\n[Skipped] Same action already executed: {action_name}")
+                    print(f"\n[Blocked] System intercepted duplicate command: {action_name}")
+                    err_msg = f"❌ System Error: You attempted to run the exact same command '{action_name}' with the identical parameters again. This is forbidden. Change your strategy, modify your parameters, and try a completely different approach."
+                    all_results.append(err_msg)
                     continue
+                    
                 executed_actions.add(action_key)
                 if action_name in _WEB_TOOLS:
                     executed_actions.add(type_key)

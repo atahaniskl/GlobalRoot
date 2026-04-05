@@ -121,6 +121,42 @@ def append_file(path: str, content: str) -> str:
     except Exception as e:
         return f"❌ APPEND ERROR: {type(e).__name__}: {str(e)}"
 
+def edit_file(path: str, old_string: str, new_string: str) -> str:
+    """Replaces old_string with new_string in a file safely."""
+    try:
+        file_path = Path(path).expanduser().resolve()
+    except Exception as e:
+        return f"❌ Invalid file path: {str(e)}"
+
+    if file_path.name in PROTECTED_FILES:
+        return (
+            f"❌ SECURITY: '{file_path.name}' cannot be modified with edit_file!\n"
+            f"This is a memory file. Use memory_edit to modify it."
+        )
+    
+    if not is_path_allowed(file_path):
+        return f"❌ SECURITY: '{path}' is not in allowed directories!"
+        
+    if not file_path.exists():
+        return f"❌ File not found: {file_path}"
+        
+    try:
+        content = file_path.read_text(encoding="utf-8")
+        
+        occurrences = content.count(old_string)
+        if occurrences == 0:
+            # Maybe it's a newline formatting issue? Offer a hint.
+            return f"❌ The string you provided to replace was NOT FOUND in {file_path.name}. Tip: Ensure exact match including exact spaces and line breaks."
+        elif occurrences > 1:
+            return f"❌ Ambiguous edit: The exact old_string appears {occurrences} times in the file. Please provide a larger chunk of text that includes surrounding lines so the system can uniquely identify which segment to replace."
+            
+        new_content = content.replace(old_string, new_string)
+        file_path.write_text(new_content, encoding="utf-8")
+        
+        return f"✅ File successfully patched: {file_path} (Replaced 1 occurrence of old_string)."
+        
+    except Exception as e:
+        return f"❌ EDIT ERROR: {type(e).__name__}: {str(e)}"
 
 if __name__ == "__main__":
     print("=== File Write Tool Test ===\n")

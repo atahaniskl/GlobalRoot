@@ -6,6 +6,7 @@ tavily-python
 edge-tts
 langdetect
 pygame
-portaudio
+networkx
+
 SpeechRecognition
 pyaudio
